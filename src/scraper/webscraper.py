@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, Type
 
 import zendriver as zd
@@ -25,6 +26,10 @@ class WebScraper:
         print("Starting scraper...")
         self.browser = await zd.start(headless=self.headless)
         self.tab = await self.browser.get(self.start_url)
+
+        # Navigate to website URL
+        await self.tab.get(self.start_url)
+
         print("Scraper started successfully.")
         return self
 
@@ -55,14 +60,16 @@ class WebScraper:
                 "Scraper not started. Please use 'async with WebScraper(...)'."
             )
 
+        # CASE 1: Use a specific selector to scrape
         if selector:
             print(f"Finding element with selector: '{selector}'")
-            selector_html = await self.tab.find_all(selector)
-            selector_html = [str(html) for html in selector_html]
-            content = "\n".join(selector_html)
+            element = await self.tab.select_all(selector)
+            element = [str(e) for e in element]
+            content = "\n".join(element)
         else:
-            print("Getting HTML body...")
-            body_html = await self.tab.select("body")
-            content = await body_html.get_html()
+            # CASE 2: Full HTML body scraping with modern HTML structure
+            await self.tab.select("body")  # Navigate tab to body content
+            print("Standard page structure detected. Waiting for content to load...")
+            content = await self.tab.get_content()
 
         return content
