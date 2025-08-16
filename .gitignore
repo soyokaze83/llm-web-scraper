@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Notebooks
+*.ipynb
+
+# Environment variables
+.env
