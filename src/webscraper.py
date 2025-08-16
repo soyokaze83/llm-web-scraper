@@ -1,4 +1,3 @@
-import asyncio
 from typing import Optional, Type
 
 import zendriver as zd
