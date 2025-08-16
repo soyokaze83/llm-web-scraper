@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from scraper.webscraper import WebScraper
+from webscraper import WebScraper
 
 
 async def main():
