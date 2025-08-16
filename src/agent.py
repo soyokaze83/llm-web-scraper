@@ -1,9 +1,12 @@
-from typing import List, Optional
+import asyncio
+import json
+from typing import Any, Dict, List
 
 import dspy
 from pydantic import BaseModel
 
-from webscraper import WebScraper
+from src.scraper.webscraper import WebScraper
+from src.scraper.webtools import WebInteractionTools
 
 
 class JSONOutput(BaseModel):
@@ -20,7 +23,9 @@ class ScraperAgentSignature(dspy.Signature):
     Your final answer MUST be a single, valid JSON string containing the extracted data.
     """
 
-    html_content: str = dspy.InputField(desc="The full HTML content of the webpage.")
+    distilled_content: str = dspy.InputField(
+        desc="A JSON string summarizing the forms and tables on the webpage."
+    )
     task: str = dspy.InputField(desc="The natural language instruction from the user.")
     answer: JSONOutput = dspy.OutputField(
         desc="A valid JSON string with the final extracted data."
@@ -31,19 +36,38 @@ class ScraperAgent(dspy.Module):
     """DSPy module to scrape based on defined DSPy signature."""
 
     def __init__(
-        self, model_id: str, api_key: str, scrape_tool: Optional[WebScraper] = None
+        self,
+        web_scraper: WebScraper,
+        interaction_tools: WebInteractionTools,
     ):
-        self.signature = dspy.functional.TypedPredictor(ScraperAgentSignature)
-        self.scrape_tool = scrape_tool
+        super().__init__()
+        self.signature = dspy.Predict(ScraperAgentSignature)
+        self.scraper = web_scraper
+        self.tools = interaction_tools
 
-        # TODO: Define model with DSPy
-
-    def forward(self, html_content: str, user_task: str):
         tools = self._get_tools()
-        agent = dspy.ReAct(ScraperAgentSignature, tools=tools)
-        result = agent(html_content, user_task)
+        self.agent = dspy.ReAct(ScraperAgentSignature, tools=tools)
 
+    async def aforward(self, distilled_content: Dict[str, Any], user_task: str):
+        json_distilled_content = json.dumps(distilled_content, indent=2)
+        result = await self.agent.acall(
+            distilled_content=json_distilled_content, task=user_task
+        )
         return result
 
     def _get_tools(self):
-        pass
+        """Configures tools and wraps async functions to be sync-callable."""
+
+        tools = [
+            self.tools.get_current_url,
+            self.tools.list_interactive_elements,
+            self.tools.read_content_of_element,
+            self.tools.type_into_element,
+            self.tools.click_element,
+            self.tools.select_dropdown_option,
+            self.tools.navigate_to_url,
+            self.tools.scroll_page,
+            self.scraper.get_distilled_dom,
+            self.scraper.get_full_content,
+        ]
+        return tools
