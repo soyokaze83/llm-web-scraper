@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any, Dict, Optional, Type
 
 import zendriver as zd
@@ -95,12 +94,14 @@ class WebScraper:
                 label = await self._find_desc(sel, label_map)
 
                 options = [
-                    o.text_all.strip() for o in await sel.query_selector_all("option")
+                    {"text": o.text_all.strip(), "value": o.attrs.get("value")}
+                    for o in await sel.query_selector_all("option")
                 ]
                 controls.append(
                     {
                         "type": "select",
-                        "label": label,
+                        "description": label,
+                        "name": sel.attrs.get("name"),
                         "options": options,
                     }
                 )
@@ -112,7 +113,9 @@ class WebScraper:
                     {
                         "type": "input",
                         "input_type": inp.attrs.get("type", "text"),
-                        "label": label,
+                        "description": label,
+                        "name": inp.attrs.get("name"),
+                        "value": inp.attrs.get("value"),
                         "placeholder": inp.attrs.get("placeholder"),
                     }
                 )
@@ -120,7 +123,9 @@ class WebScraper:
             # 3. Process button tags
             for btn in await form.query_selector_all("button, input[type=submit]"):
                 text = btn.text_all.strip() or btn.attrs.get("value")
-                controls.append({"type": "button", "text": text})
+                controls.append(
+                    {"type": "button", "text": text, "name": btn.attrs.get("name")}
+                )
 
             forms_data.append(
                 {
