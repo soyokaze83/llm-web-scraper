@@ -12,3 +12,6 @@ wheels/
 
 # Notebooks
 *.ipynb
+
+# Miscellaneous
+result
