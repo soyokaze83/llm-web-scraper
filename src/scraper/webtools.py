@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, List
 
 from zendriver import Tab
@@ -23,24 +24,27 @@ class WebInteractionTools:
         )
         interactive_elements = []
         for el in elements:
-            position = await el.get_position()
-            if position:
-                text = el.text_all.strip().replace("\n", " ").replace("\t", " ")
-                tag = el.tag_name
-                attrs = el.attrs
+            try:
+                position = await el.get_position()
+                if position:
+                    text = el.text_all.strip().replace("\n", " ").replace("\t", " ")
+                    tag = el.tag_name
+                    attrs = el.attrs
 
-                el_info = {
-                    "tag": tag.lower(),
-                    "text": text
-                    if text
-                    else attrs.get(
-                        "aria-label", attrs.get("name", attrs.get("id", ""))
-                    ),
-                }
-                if "id" in attrs and attrs["id"]:
-                    el_info["css_selector"] = f"#{attrs['id']}"
+                    el_info = {
+                        "tag": tag.lower(),
+                        "text": text
+                        if text
+                        else attrs.get(
+                            "aria-label", attrs.get("name", attrs.get("id", ""))
+                        ),
+                    }
+                    if "id" in attrs and attrs["id"]:
+                        el_info["css_selector"] = f"#{attrs['id']}"
 
-                interactive_elements.append(el_info)
+                    interactive_elements.append(el_info)
+            except Exception:
+                continue
         return interactive_elements
 
     async def read_content_of_element(self, css_selector: str) -> str:
@@ -51,7 +55,7 @@ class WebInteractionTools:
         try:
             element = await self.page.select(css_selector)
             if element:
-                return (await element.text_all).strip()
+                return element.text_all.strip()
             return f"Error: Element with selector '{css_selector}' not found."
         except Exception as e:
             return f"Error reading element '{css_selector}': {e}"
@@ -79,16 +83,16 @@ class WebInteractionTools:
             if not element:
                 return f"Error: Element with selector '{css_selector}' not found."
 
-            # Check if element is visible using get_position (as done in your list_interactive_elements)
+            # Check if element is visible using get_position
             position = await element.get_position()
             if not position:
                 return f"Error: Element '{css_selector}' is not visible or not positioned in viewport."
 
-            selector_constant = f"{css_selector}_const"
             await self.page.evaluate(f"""
-                  const {selector_constant} = document.querySelector("{css_selector}");
-                  if ({selector_constant}) {selector_constant}.click();
-              """)
+                var element = document.querySelector("{css_selector}");
+                if (element) element.click();
+            """)
+
             return f"Successfully clicked element '{css_selector}'."
 
         except Exception as e:
@@ -101,10 +105,9 @@ class WebInteractionTools:
         """
         try:
             select_element = await self.page.select(css_selector)
-            if not select_element or (await select_element.tag_name) != "SELECT":
+            if not select_element:
                 return f"Error: Element '{css_selector}' is not a dropdown."
 
-            # Find the specific option within the dropdown by its value attribute
             option_to_select = await select_element.query_selector(
                 f"option[value='{value}']"
             )
@@ -130,3 +133,29 @@ class WebInteractionTools:
             await self.page.evaluate("window.scrollBy(0, -window.innerHeight);")
             return "Scrolled up."
         return "Error: Invalid scroll direction. Use 'up' or 'down'."
+
+    async def wait_loading(self, css_selector: str, timeout: int = 30) -> str:
+        """
+        Waits for a specific element (like a loading spinner or loading message) to disappear from the page.
+        Ensure a loading process is complete before proceeding.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            start_time = loop.time()
+
+            while True:
+                element = await self.page.query_selector(css_selector)
+                if not element:
+                    return f"Element '{css_selector}' disappeared successfully."
+
+                if loop.time() - start_time > timeout:
+                    raise asyncio.TimeoutError(
+                        f"Element '{css_selector}' did not disappear within {timeout} seconds."
+                    )
+
+                await asyncio.sleep(0.5)
+
+        except asyncio.TimeoutError as e:
+            return f"Error: {e}"
+        except Exception as e:
+            return f"An error occurred while waiting for element '{css_selector}' to disappear: {e}"
