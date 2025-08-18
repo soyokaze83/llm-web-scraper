@@ -44,154 +44,26 @@ class WebScraper:
             await self.browser.stop()
             print("Scraper stopped successfully.")
 
-    async def get_full_content(self) -> str:
-        """
-        Get full HTML content from the requested URL page.
-
-        Returns:
-            The full HTML content of the URL page in string format.
-        """
+    async def get_head_content(self) -> str:
+        """Get head section of the HTML page."""
 
         if not self.tab or not self.browser:
             raise RuntimeError(
                 "Scraper not started. Please use 'async with WebScraper(...)'."
             )
 
-        await self.tab.select("body")  # Navigate tab to body content
-        full_content = await self.tab.get_content()
-        return full_content
+        return await self.tab.select("head")
 
-    async def get_distilled_dom(self) -> Dict[str, Any]:
-        """
-        Get distilled DOM of URL page with important fields i.e. forms & tables.
-
-        Returns:
-            Forms and table data of URL page.
-        """
+    async def get_body_content(self) -> str:
+        """Get body section of the HTML page."""
 
         if not self.tab or not self.browser:
             raise RuntimeError(
                 "Scraper not started. Please use 'async with WebScraper(...)'."
             )
 
-        # PROCESS FORMS
-        forms_data = []
-        all_forms = await self.tab.select_all("form")
+        content = await self.tab.select("body")
+        # Wait for page to completely load
+        await self.tab.wait_for_ready_state(until="complete", timeout=15)
 
-        # Pre-fetch all labels and create a map for faster lookup
-        all_labels = await self.tab.select_all("label")
-        label_map = {
-            label.attrs.get("for"): label.text_all.strip()
-            for label in all_labels
-            if label.attrs.get("for")
-        }
-
-        for form in all_forms:
-            controls = []
-
-            # 1. Process select tags
-            for sel in await form.query_selector_all("select"):
-                label = await self._find_desc(sel, label_map)
-
-                options = [
-                    {"text": o.text_all.strip(), "value": o.attrs.get("value")}
-                    for o in await sel.query_selector_all("option")
-                ]
-                controls.append(
-                    {
-                        "type": "select",
-                        "description": label,
-                        "name": sel.attrs.get("name"),
-                        "options": options,
-                    }
-                )
-
-            # 2. Process input tags
-            for inp in await form.query_selector_all("input"):
-                label = await self._find_desc(inp, label_map)
-                controls.append(
-                    {
-                        "type": "input",
-                        "input_type": inp.attrs.get("type", "text"),
-                        "description": label,
-                        "name": inp.attrs.get("name"),
-                        "value": inp.attrs.get("value"),
-                        "placeholder": inp.attrs.get("placeholder"),
-                    }
-                )
-
-            # 3. Process button tags
-            for btn in await form.query_selector_all("button, input[type=submit]"):
-                text = btn.text_all.strip() or btn.attrs.get("value")
-                controls.append(
-                    {"type": "button", "text": text, "name": btn.attrs.get("name")}
-                )
-
-            forms_data.append(
-                {
-                    "id": form.attrs.get("id"),
-                    "action": form.attrs.get("action"),
-                    "controls": controls,
-                }
-            )
-
-        # PROCESS TABLES: <th>, <tr>, <td>
-        tables_data = []
-        all_tables = await self.tab.select_all("table")
-        for table in all_tables:
-            headers = [
-                th.text_all.strip() for th in await table.query_selector_all("th")
-            ]
-
-            sample_rows = []
-            all_rows = await table.query_selector_all("tr")
-            for row in all_rows[:3]:
-                cells = [
-                    td.text_all.strip() for td in await row.query_selector_all("td")
-                ]
-                if cells:
-                    sample_rows.append(cells)
-
-            tables_data.append(
-                {
-                    "id": table.attrs.get("id"),
-                    "headers": headers,
-                    "sample_rows": sample_rows,
-                }
-            )
-
-        return {"forms": forms_data, "tables": tables_data}
-
-    async def _find_desc(
-        self, element: Element, label_map: Dict[str, str]
-    ) -> Optional[str]:
-        """
-        Finds commonly used description for user input tags.
-
-        Args:
-            element (Element): The form element to find the description.
-            label_map (Dict): Dict mapping label 'for' attribute to text content.
-
-        Returns:
-            The user input tag description.
-        """
-
-        # Find from label tags using pre-fetched label map
-        elem_id = element.attrs.get("id")
-        if elem_id and elem_id in label_map:
-            return label_map[elem_id]
-
-        parent = element.parent
-        while parent:
-            if parent.node_name == "LABEL":
-                return parent.text_all.strip()
-            parent = parent.parent
-
-        # Fallback if no label tag found
-        description = (
-            element.attrs.get("placeholder")
-            or element.attrs.get("aria-label")
-            or element.attrs.get("name")
-        )
-
-        return description
+        return content
