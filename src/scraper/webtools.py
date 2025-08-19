@@ -88,10 +88,8 @@ class WebInteractionTools:
             if not position:
                 return f"Error: Element '{css_selector}' is not visible or not positioned in viewport."
 
-            await self.page.evaluate(f"""
-                var element = document.querySelector("{css_selector}");
-                if (element) element.click();
-            """)
+            # Click on element
+            await element.click()
 
             return f"Successfully clicked element '{css_selector}'."
 
