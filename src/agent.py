@@ -1,6 +1,4 @@
-import asyncio
-import json
-from typing import Any, Dict, List
+from typing import List
 
 import dspy
 from pydantic import BaseModel
@@ -19,13 +17,16 @@ class JSONOutput(BaseModel):
 class ScraperAgentSignature(dspy.Signature):
     """
     You are a web data scraping agent. Your goal is to interact with the given HTML content to complete the user's task.
-    You must use the provided tools to find elements, fill forms, click buttons, and extract information from tables, lists, or paragraphs as needed.
+    You must use the provided tools to find elements, fill forms, click buttons, and extract information.
 
     **IMPORTANT WORKFLOW:**
     1. Analyze the HTML and the task to understand what information to extract.
     2. Use tools to interact with the page if necessary (e.g., clicking buttons, filling forms).
-    3. After any action that changes the page, you MUST first use `wait_loading` to ensure any loading has been resolved.
-    4. After waiting, you MUST use `get_body_content` to get the updated body of the HTML page.
+    3. After any action that changes the page (like a click or form submission), you MUST use `wait_loading`.
+        Crucially, you MUST wait for a specific child element that indicates the data has fully loaded.
+        - **BAD:** Waiting for a container ID like '#searchResults' is unreliable if it shows a "loading..." message first.
+        - **GOOD:** Wait for an element *inside* the container, like `#searchResults table`. This ensures the data is actually present.
+    4. After waiting, you MUST use `get_body_content` to get the updated HTML of the page.
     5. Use `read_content_of_element` to extract the relevant text from the new content.
     6. Format your final answer as a single, valid JSON object following the structure of a JSON table with headers and rows.
     """
@@ -59,12 +60,10 @@ class ScraperAgent(dspy.Module):
         self.scraper = web_scraper
         self.tools = interaction_tools
 
-        tools = self._get_tools()
-        self.agent = dspy.ReAct(ScraperAgentSignature, tools=tools)
+        all_tools = self._get_tools()
+        self.agent = dspy.ReAct(signature=ScraperAgentSignature, tools=all_tools)
 
-    # async def aforward(self, distilled_content: Dict[str, Any], user_task: str):
     async def aforward(self, full_content: str, user_task: str):
-        # json_distilled_content = json.dumps(distilled_content, indent=2)
         result = await self.agent.acall(html_content=full_content, task=user_task)
         return result
 
