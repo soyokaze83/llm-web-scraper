@@ -1,7 +1,7 @@
-from typing import Any, Dict, Optional, Type
+from typing import Optional, Type
 
 import zendriver as zd
-from zendriver import Browser, Element, Tab
+from zendriver import Browser, Tab
 
 
 class WebScraper:
