@@ -10,56 +10,6 @@ class WebInteractionTools:
     def __init__(self, page: Tab):
         self.page = page
 
-    async def get_current_url(self) -> str:
-        """Returns the current URL of the webpage to understand the agent's location."""
-        return f"Current URL is: {self.page.url}"
-
-    async def list_interactive_elements(self) -> List[Dict[str, str]]:
-        """
-        Provides a list of all visible interactive elements (links, buttons, inputs, selects).
-        Use this to discover what actions are possible on the page, especially if you are unsure of a CSS selector.
-        """
-        elements = await self.page.select_all(
-            "a, button, input:not([type=hidden]), select"
-        )
-        interactive_elements = []
-        for el in elements:
-            try:
-                position = await el.get_position()
-                if position:
-                    text = el.text_all.strip().replace("\n", " ").replace("\t", " ")
-                    tag = el.tag_name
-                    attrs = el.attrs
-
-                    el_info = {
-                        "tag": tag.lower(),
-                        "text": text
-                        if text
-                        else attrs.get(
-                            "aria-label", attrs.get("name", attrs.get("id", ""))
-                        ),
-                    }
-                    if "id" in attrs and attrs["id"]:
-                        el_info["css_selector"] = f"#{attrs['id']}"
-
-                    interactive_elements.append(el_info)
-            except Exception:
-                continue
-        return interactive_elements
-
-    async def read_content_of_element(self, css_selector: str) -> str:
-        """
-        Reads the full text content of an element found by its CSS selector.
-        Useful for extracting data from paragraphs, divs, or table cells.
-        """
-        try:
-            element = await self.page.select(css_selector)
-            if element:
-                return element.text_all.strip()
-            return f"Error: Element with selector '{css_selector}' not found."
-        except Exception as e:
-            return f"Error reading element '{css_selector}': {e}"
-
     async def type_into_element(self, css_selector: str, text: str) -> str:
         """
         Waits for a specific input field to be ready, then types the given text into it.

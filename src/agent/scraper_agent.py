@@ -72,9 +72,6 @@ class ScraperAgent(dspy.Module):
 
         tools = [
             # Interactive tools
-            self.tools.get_current_url,
-            self.tools.list_interactive_elements,
-            self.tools.read_content_of_element,
             self.tools.type_into_element,
             self.tools.click_element,
             self.tools.select_dropdown_option,
@@ -84,6 +81,9 @@ class ScraperAgent(dspy.Module):
             # Page HTML scraping tools
             self.scraper.get_body_content,
             self.scraper.get_head_content,
+            self.scraper.get_current_url,
+            self.scraper.list_interactive_elements,
+            self.scraper.read_content_of_element,
             # Internal agent tool
             self._store_and_finish,
         ]

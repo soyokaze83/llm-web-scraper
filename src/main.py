@@ -69,10 +69,10 @@ async def main():
         initial_content = await scraper.get_body_content()
         webtools = WebInteractionTools(scraper.tab)
 
-        # Create a shared state dictionary
+        # Create a shared state dictionary to be kept by ScraperAgent
         shared_state = {"final_html": None}
 
-        # Pass the state to the ScraperAgent
+        # Initialize scraper & extractor agent
         scraper_agent = ScraperAgent(
             web_scraper=scraper,
             interaction_tools=webtools,
@@ -82,7 +82,7 @@ async def main():
 
         await scraper_agent.acall(full_content=initial_content, user_task=user_input)
 
-        # Retrieve the final HTML from the shared state
+        # Retrieve the final HTML from ScraperAgent's shared state
         final_html = shared_state.get("final_html")
 
         if not final_html:

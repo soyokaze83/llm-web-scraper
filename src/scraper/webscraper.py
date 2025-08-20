@@ -1,4 +1,4 @@
-from typing import Optional, Type
+from typing import Dict, List, Optional, Type
 
 import zendriver as zd
 from zendriver import Browser, Tab
@@ -72,3 +72,53 @@ class WebScraper:
             return f"Error: Element with selector '{selector_to_use}' not found."
         except Exception as e:
             return f"Error getting content for selector '{selector_to_use}': {e}"
+
+    async def get_current_url(self) -> str:
+        """Returns the current URL of the webpage to understand the agent's location."""
+        return f"Current URL is: {self.tab.url}"
+
+    async def list_interactive_elements(self) -> List[Dict[str, str]]:
+        """
+        Provides a list of all visible interactive elements (links, buttons, inputs, selects).
+        Use this to discover what actions are possible on the page, especially if you are unsure of a CSS selector.
+        """
+        elements = await self.tab.select_all(
+            "a, button, input:not([type=hidden]), select"
+        )
+        interactive_elements = []
+        for el in elements:
+            try:
+                position = await el.get_position()
+                if position:
+                    text = el.text_all.strip().replace("\n", " ").replace("\t", " ")
+                    tag = el.tag_name
+                    attrs = el.attrs
+
+                    el_info = {
+                        "tag": tag.lower(),
+                        "text": text
+                        if text
+                        else attrs.get(
+                            "aria-label", attrs.get("name", attrs.get("id", ""))
+                        ),
+                    }
+                    if "id" in attrs and attrs["id"]:
+                        el_info["css_selector"] = f"#{attrs['id']}"
+
+                    interactive_elements.append(el_info)
+            except Exception:
+                continue
+        return interactive_elements
+
+    async def read_content_of_element(self, css_selector: str) -> str:
+        """
+        Reads the full text content of an element found by its CSS selector.
+        Useful for extracting data from paragraphs, divs, or table cells.
+        """
+        try:
+            element = await self.tab.select(css_selector)
+            if element:
+                return element.text_all.strip()
+            return f"Error: Element with selector '{css_selector}' not found."
+        except Exception as e:
+            return f"Error reading element '{css_selector}': {e}"
