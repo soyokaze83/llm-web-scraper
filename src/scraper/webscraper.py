@@ -1,7 +1,7 @@
-from typing import Any, Dict, Optional, Type
+from typing import Optional, Type
 
 import zendriver as zd
-from zendriver import Browser, Element, Tab
+from zendriver import Browser, Tab
 
 
 class WebScraper:
@@ -54,16 +54,21 @@ class WebScraper:
 
         return await self.tab.select("head")
 
-    async def get_body_content(self) -> str:
-        """Get body section of the HTML page."""
+    async def get_body_content(self, css_selector: Optional[str] = None) -> str:
+        """
+        Get HTML content from the page. If a css_selector is provided, gets content
+        from that specific element. Otherwise, returns the entire body.
+        Using a specific selector is highly recommended for efficiency.
+        """
+        if not self.tab:
+            raise RuntimeError("Scraper not started.")
 
-        if not self.tab or not self.browser:
-            raise RuntimeError(
-                "Scraper not started. Please use 'async with WebScraper(...)'."
-            )
+        selector_to_use = css_selector or "body"
 
-        content = await self.tab.select("body")
-        # Wait for page to completely load
-        await self.tab.wait_for_ready_state(until="complete", timeout=15)
-
-        return content
+        try:
+            element = await self.tab.select(selector_to_use)
+            if element:
+                return str(element)  # Return the element's outer HTML
+            return f"Error: Element with selector '{selector_to_use}' not found."
+        except Exception as e:
+            return f"Error getting content for selector '{selector_to_use}': {e}"
