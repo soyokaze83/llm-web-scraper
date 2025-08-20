@@ -65,7 +65,20 @@ The testing is done using `pytest` where before running the actual test, we woul
 python tests/setup/generate_tests.py --url {WEBSITE_URL}
 ```
 
-The output would be written to `test_cases.json` by default. After this test case file has been generated, we may now execute the test script with the following commands.
+The output would be written to `test_cases.json` by default. It would something like the following:
+```json
+{
+  "url": "https://shorthorn.digitalbeef.com/",
+  "tasks": [
+    "Search for an animal with the registration number '12345'",
+    "Search for a ranch with the name containing 'ABC'",
+    "Search for an animal by tattoo 'XYZ123'",
+    "Search for animals with a minimum weaning weight of 50 and a maximum weaning weight of 100",
+    "Calculate the due date for a cow bred on '01/01/2025'"
+  ]
+}
+```
+ After this test case file has been generated, we may now execute the test script with the following commands.
 
 ```bash
 # With pytest
@@ -75,3 +88,75 @@ pytest -s -v
 # With uv
 uv run pytest -s -v
 ```
+
+## Example `main.py` Run
+```bash
+>>> python ./src/main.py
+🔗 Enter link: https://shorthorn.digitalbeef.com/
+❓ What would you like to scrape?
+Search for animals with a minimum weaning weight of 50 and a maximum weaning weight of 100
+
+Starting scraper...
+Scraper started successfully.
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: type_into_element
+   Inputs: {'kwargs': {'css_selector': '#minwwt', 'text': '50'}}
+👀 Observation: Successfully typed '50' into element '#minwwt'.
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: type_into_element
+   Inputs: {'kwargs': {'css_selector': '#maxwwt', 'text': '100'}}
+👀 Observation: Successfully typed '100' into element '#maxwwt'.
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: click_element
+   Inputs: {'kwargs': {'css_selector': "input[value='Search...'][onclick='doSearch_Epd();']"}}
+👀 Observation: Successfully clicked element 'input[value='Search...'][onclick='doSearch_Epd();']'.
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: wait_loading
+   Inputs: {'kwargs': {'css_selector': '#dvSearchResults', 'timeout': 30}}
+👀 Observation: Error: Element '#dvSearchResults' did not disappear within 30 seconds.
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: get_body_content
+   Inputs: {'kwargs': {'css_selector': '#dvSearchResults'}}
+👀 Observation: <div id="dvSearchResults" style="width: 100%; min-width: 650px; text-align: center; display: block;"...
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: wait_loading
+   Inputs: {'kwargs': {'css_selector': '#dvSearchResults', 'timeout': 30}}
+👀 Observation: Error: Element '#dvSearchResults' did not disappear within 30 seconds.
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: get_body_content
+   Inputs: {'kwargs': {'css_selector': '#dvSearchResults'}}
+👀 Observation: <div id="dvSearchResults" style="width: 100%; min-width: 650px; text-align: center; display: block;"...
+--------------------------------------------------
+
+--------------------------------------------------
+🤖 Scraper Agent - Calling Tool: _store_and_finish
+   Inputs: {'kwargs': {'css_selector': '#dvSearchResults'}}
+Storing final HTML content...
+👀 Observation: Successfully retrieved and stored the HTML content from selector '#dvSearchResults'. The task is com...
+--------------------------------------------------
+
+Extracting final data...
+Stopping scraper...
+Scraper stopped successfully.
+Answer: header=['Reg # Tattoo Name', 'CED', 'BW', 'WW', 'YW', 'MK', 'TM', 'CEM', 'ST', 'YG', 'CW', 'REA', 'FAT', 'MB', '$CEZ', '$BMI', '$CPI', '$F'] data=[['AR4397149 JSF 84N JSF MISS ME 84N', '2', '5.7', '95', '139', '19', '66', '2', '15', '-0.3', '31', '0.63', '-0.08', '0.03', '-6.49', '148.61', '132.11', '70.61'], ['AR4294554 501G UI EXCHANGE 501G', '4', '7.3', '94', '144', '27', '74', '2', '5', '-0.08', '67', '0.87', '-0.02', '0.51', '-0.03', '151.55', '123.75', '86.03'], ['AR4294560 538G UI DENALI 538G', '12', '2.2', '90', '151', '22', '66', '7', '12', '-0.19', '52', '0.71', '-0.05', '0.57', '23.31', '155.18', '167.13', '83.01'], ['AR4375666 212L HOFF MISS 1872 SH 212L', '9', '2.5', '89', '149', '29', '73', '7', '11', '-0.12', '71', '0.84', '-0.04', '0.44', '15.57', '151.36', '156.79', '85.43'],...]]
+
+Dumping results into result/result_2932aede-a21e-4ba7-9ac1-38468fa95136.json...
+Successfully saved results to result_2932aede-a21e-4ba7-9ac1-38468fa95136.json!
+```
+
+## Personal Takeaways
+I've done my fair share of website scraping, but scraping in an agentic fashion is a totally different beast. The difficulties I faced in building this project is how I would manage the waiting time of the agent. In my previous tries, the agent would always fail to wait for the data to correctly fetch and just return empty outputs on the resulting header and row data. The fix to this was enforcing better prompt rules to the scraper agent's DSPy signature for it to actually retry the waiting process again. Another problem would be the rate limit error for the model's capabilities. Since I'm using Google's Free Tier, I only used model from the Gemini families (but don't worry, DSPy works with most OpenAI API compatible models) especially Gemini 2.0 Flash. Even with its one million tokens per minute usage, I sometimes still hit a truncation warning. Due to this, I found out about splitting the task of both scraping or processing the website to locate the results, and then extracting the result into data in header and row format.
+
+Challenges will always be tough, but I still do take enjoyment in doing something like this where I could always learn new things in the engineering sphere. I hope that my solution will be sufficient to go to the next round! 😁🙌
