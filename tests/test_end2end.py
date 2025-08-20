@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Any
 
 import dspy
@@ -59,9 +60,10 @@ def test_scraping_pipeline(url, task):
     print(f"\n🧪 Running test for task: '{task}'")
 
     logger = ToolLoggingCallback()
+    model_name = os.environ["MODEL_NAME"]
     next_api_key = key_rotator.get_next_key()
     next_lm = dspy.LM(
-        model="gemini/gemini-2.0-flash",
+        model=model_name,
         api_key=next_api_key,
         max_tokens=8000,
     )

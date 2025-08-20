@@ -13,6 +13,7 @@ from scraper import WebInteractionTools, WebScraper
 
 load_dotenv()
 API_KEY = os.environ["API_KEY"]
+MODEL_NAME = os.environ["MODEL_NAME"]
 
 
 class ToolLoggingCallback(BaseCallback):
@@ -55,12 +56,11 @@ class ToolLoggingCallback(BaseCallback):
 async def main():
     url_input = input("🔗 Enter link: ")
     user_input = input("❓ What would you like to scrape?\n")
-    model_name = "gemini/gemini-2.0-flash"
     print()
 
     logger = ToolLoggingCallback()
 
-    model = dspy.LM(model=model_name, api_key=API_KEY, max_tokens=8000)
+    model = dspy.LM(model=MODEL_NAME, api_key=API_KEY, max_tokens=8000)
     dspy.configure(
         lm=model, allow_async=True, callbacks=[logger], adapter=dspy.JSONAdapter()
     )
@@ -100,7 +100,7 @@ async def main():
     final_output = extract_result.answer.model_dump()
     final_output["url"] = url_input
     final_output["prompt"] = user_input
-    final_output["model"] = model_name
+    final_output["model"] = MODEL_NAME
 
     # Output & save file
     random_uuid = uuid.uuid4()

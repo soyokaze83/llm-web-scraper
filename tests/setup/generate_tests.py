@@ -11,14 +11,14 @@ from src.scraper import WebScraper
 
 load_dotenv()
 API_KEY = os.environ["API_KEY"]
+MODEL_NAME = os.environ["MODEL_NAME"]
 
 
 async def generate_cases(url: str, output_file: str):
     """Generate test cases from page URL."""
 
     # Configure DSPy generation model
-    model_name = "gemini/gemini-2.0-flash"
-    model = dspy.LM(model=model_name, api_key=API_KEY, max_tokens=8000)
+    model = dspy.LM(model=MODEL_NAME, api_key=API_KEY, max_tokens=8000)
     dspy.configure(lm=model, allow_async=True, adapter=dspy.JSONAdapter())
 
     test_generator = TestGeneratorAgent()
