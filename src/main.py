@@ -8,7 +8,8 @@ import dspy
 from dotenv import load_dotenv
 from dspy.utils.callback import BaseCallback
 
-from agent import ScraperAgent
+from src.agent.extractor_agent import ExtractorAgent
+from src.agent.scraper_agent import ScraperAgent
 from src.scraper.webscraper import WebScraper
 from src.scraper.webtools import WebInteractionTools
 
@@ -17,26 +18,21 @@ API_KEY = os.environ["API_KEY"]
 
 
 class ToolLoggingCallback(BaseCallback):
-    """
-    A callback handler for logging tool usage, which now ignores the internal 'finish' tool.
-    """
+    """A callback handler for logging tool usage."""
 
     def __init__(self):
         super().__init__()
         self._tool_calls = {}
+        self.active_agent_name = "SYSTEM"
 
     def on_tool_start(self, call_id: str, instance: Any, inputs: dict[str, Any]):
         """Triggered before a tool is called."""
         tool_name = instance.name
-        self._tool_calls[call_id] = tool_name  # Store the tool name
-
-        print("─" * 50)
-        print(f"🤖 Calling Tool: {tool_name}")
-
-        # Ignore DSPy's internal 'finish' tool
-        if tool_name == "finish":
+        if not tool_name or tool_name == "finish":
             return
-
+        self._tool_calls[call_id] = tool_name
+        print("-" * 50)
+        print(f"🤖 Scraper Agent - Calling Tool: {tool_name}")
         if inputs:
             print(f"   Inputs: {inputs}")
 
@@ -45,13 +41,8 @@ class ToolLoggingCallback(BaseCallback):
     ):
         """Triggered after a tool has finished."""
         tool_name = self._tool_calls.pop(call_id, None)
-
-        # Ignore DSPy's internal 'finish' tool
-        if tool_name == "finish":
-            print("Wrapping up scraping process...")
-            print("─" * 50 + "\n")
+        if not tool_name:
             return
-
         if exception:
             print(f"🚨 Tool Error: {exception}")
         else:
@@ -59,39 +50,57 @@ class ToolLoggingCallback(BaseCallback):
                 outputs = str(outputs)
                 if len(outputs) > 100:
                     outputs = f"{outputs[:100]}..."
-            print(f"👀 Observation: {outputs}")
-        print("─" * 50 + "\n")
+                print(f"👀 Observation: {outputs}")
+        print("-" * 50 + "\n")
 
 
 async def main():
     url_input = input("🔗 Enter link: ")
     user_input = input("❓ What would you like to scrape?\n")
-    model_name = "gemini/gemini-2.5-flash"
+    model_name = "gemini/gemini-2.0-flash"
     print()
 
     logger = ToolLoggingCallback()
 
-    model = dspy.LM(
-        model=model_name,
-        api_key=API_KEY,
-    )
+    model = dspy.LM(model=model_name, api_key=API_KEY, max_tokens=8000)
     dspy.configure(
         lm=model, allow_async=True, callbacks=[logger], adapter=dspy.JSONAdapter()
     )
 
     async with WebScraper(url_input, headless=True) as scraper:
-        full_content = await scraper.get_body_content()
+        initial_content = await scraper.get_body_content()
         webtools = WebInteractionTools(scraper.tab)
 
-        # Start and call async agent
-        agent = ScraperAgent(web_scraper=scraper, interaction_tools=webtools)
-        result = await agent.acall(full_content=full_content, user_task=user_input)
+        # Create a shared state dictionary
+        shared_state = {"final_html": None}
 
-    print(f"\nReasoning: {result.reasoning}")
-    print(f"Answer: {result.answer}")
+        # Pass the state to the ScraperAgent
+        scraper_agent = ScraperAgent(
+            web_scraper=scraper,
+            interaction_tools=webtools,
+            state=shared_state,
+        )
+        extractor_agent = ExtractorAgent()
+
+        await scraper_agent.acall(full_content=initial_content, user_task=user_input)
+
+        # Retrieve the final HTML from the shared state
+        final_html = shared_state.get("final_html")
+
+        if not final_html:
+            print("Scraper Agent failed to store the final HTML.")
+            return
+
+        print("\nExtracting final data...")
+        extract_result = await extractor_agent.aforward(
+            html_content=final_html, user_task=user_input
+        )
+
+    # print(f"\nReasoning: {extract_result.reasoning}")
+    print(f"Answer: {extract_result.answer}")
 
     # Construct final output to JSON output
-    final_output = result.answer.model_dump()
+    final_output = extract_result.answer.model_dump()
     final_output["url"] = url_input
     final_output["prompt"] = user_input
     final_output["model"] = model_name
@@ -105,7 +114,7 @@ async def main():
     output_path = os.path.join("result", output_file)
     print(f"\nDumping results into {output_path}...")
     with open(output_path, "w", encoding="utf-8") as output:
-        json.dump(result.answer.model_dump(), output, indent=2)
+        json.dump(extract_result.answer.model_dump(), output, indent=2)
     print(f"Successfully saved results to {output_file}!")
 
 
