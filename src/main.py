@@ -94,7 +94,6 @@ async def main():
             html_content=final_html, user_task=user_input
         )
 
-    # print(f"\nReasoning: {extract_result.reasoning}")
     print(f"Answer: {extract_result.answer}")
 
     # Construct final output to JSON output
