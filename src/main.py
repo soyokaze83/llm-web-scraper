@@ -8,10 +8,8 @@ import dspy
 from dotenv import load_dotenv
 from dspy.utils.callback import BaseCallback
 
-from src.agent.extractor_agent import ExtractorAgent
-from src.agent.scraper_agent import ScraperAgent
-from src.scraper.webscraper import WebScraper
-from src.scraper.webtools import WebInteractionTools
+from agent import ExtractorAgent, ScraperAgent
+from scraper import WebInteractionTools, WebScraper
 
 load_dotenv()
 API_KEY = os.environ["API_KEY"]
